@@ -1,0 +1,185 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template deploys an ec2 instance with security group and a S3 bucket",
+    "Parameters": {
+        "KeyName": {
+            "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
+        }, 
+        "InstanceType" : {
+            "Description" : "WebServer EC2 instance type",
+            "Type" : "String",
+            "Default" : "t2.micro",
+            "AllowedValues" : [ "t1.micro", "t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge"],
+            "ConstraintDescription" : "must be a valid EC2 instance type."
+          },
+        "SSHLocation" : {
+            "Description" : " The IP address range that can be used to SSH to the EC2 instances",
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "Default": "0.0.0.0/0",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+        } 
+    },
+    "Mappings" : {
+        "AWSInstanceType2Arch" : {
+        "t1.micro"    : { "Arch" : "HVM64"  },
+        "t2.nano"     : { "Arch" : "HVM64"  },
+        "t2.micro"    : { "Arch" : "HVM64"  },
+        "t2.small"    : { "Arch" : "HVM64"  },
+        "t2.medium"   : { "Arch" : "HVM64"  },
+        "t2.large"    : { "Arch" : "HVM64"  },
+        "m1.small"    : { "Arch" : "HVM64"  },
+        "m1.medium"   : { "Arch" : "HVM64"  },
+        "m1.large"    : { "Arch" : "HVM64"  },
+        "m1.xlarge"   : { "Arch" : "HVM64"  },
+        "m2.xlarge"   : { "Arch" : "HVM64"  },
+        "m2.2xlarge"  : { "Arch" : "HVM64"  }
+        },
+        "AWSInstanceType2NATArch" : {
+        "t1.micro"    : { "Arch" : "NATHVM64"  },
+        "t2.nano"     : { "Arch" : "NATHVM64"  },
+        "t2.micro"    : { "Arch" : "NATHVM64"  },
+        "t2.small"    : { "Arch" : "NATHVM64"  },
+        "t2.medium"   : { "Arch" : "NATHVM64"  },
+        "t2.large"    : { "Arch" : "NATHVM64"  },
+        "m1.small"    : { "Arch" : "NATHVM64"  },
+        "m1.medium"   : { "Arch" : "NATHVM64"  },
+        "m1.large"    : { "Arch" : "NATHVM64"  },
+        "m1.xlarge"   : { "Arch" : "NATHVM64"  },
+        "m2.xlarge"   : { "Arch" : "NATHVM64"  },
+        "m2.2xlarge"  : { "Arch" : "NATHVM64"  }
+        },
+        "AWSRegionArch2AMI" : {
+        "af-south-1"       : {"HVM64" : "ami-064cc455f8a1ef504", "HVMG2" : "NOT_SUPPORTED"},
+        "ap-east-1"        : {"HVM64" : "ami-f85b1989", "HVMG2" : "NOT_SUPPORTED"},
+        "ap-northeast-1"   : {"HVM64" : "ami-0b2c2a754d5b4da22", "HVMG2" : "ami-09d0e0e099ecabba2"},
+        "ap-northeast-2"   : {"HVM64" : "ami-0493ab99920f410fc", "HVMG2" : "NOT_SUPPORTED"},
+        "ap-northeast-3"   : {"HVM64" : "ami-01344f6f63a4decc1", "HVMG2" : "NOT_SUPPORTED"},
+        "ap-south-1"       : {"HVM64" : "ami-03cfb5e1fb4fac428", "HVMG2" : "ami-0244c1d42815af84a"},
+        "ap-southeast-1"   : {"HVM64" : "ami-0ba35dc9caf73d1c7", "HVMG2" : "ami-0e46ce0d6a87dc979"},
+        "ap-southeast-2"   : {"HVM64" : "ami-0ae99b503e8694028", "HVMG2" : "ami-0c0ab057a101d8ff2"},
+        "ca-central-1"     : {"HVM64" : "ami-0803e21a2ec22f953", "HVMG2" : "NOT_SUPPORTED"},
+        "cn-north-1"       : {"HVM64" : "ami-07a3f215cc90c889c", "HVMG2" : "NOT_SUPPORTED"},
+        "cn-northwest-1"   : {"HVM64" : "ami-0a3b3b10f714a0ff4", "HVMG2" : "NOT_SUPPORTED"},
+        "eu-central-1"     : {"HVM64" : "ami-0474863011a7d1541", "HVMG2" : "ami-0aa1822e3eb913a11"},
+        "eu-north-1"       : {"HVM64" : "ami-0de4b8910494dba0f", "HVMG2" : "ami-32d55b4c"},
+        "eu-south-1"       : {"HVM64" : "ami-08427144fe9ebdef6", "HVMG2" : "NOT_SUPPORTED"},
+        "eu-west-1"        : {"HVM64" : "ami-015232c01a82b847b", "HVMG2" : "ami-0d5299b1c6112c3c7"},
+        "eu-west-2"        : {"HVM64" : "ami-0765d48d7e15beb93", "HVMG2" : "NOT_SUPPORTED"},
+        "eu-west-3"        : {"HVM64" : "ami-0caf07637eda19d9c", "HVMG2" : "NOT_SUPPORTED"},
+        "me-south-1"       : {"HVM64" : "ami-0744743d80915b497", "HVMG2" : "NOT_SUPPORTED"},
+        "sa-east-1"        : {"HVM64" : "ami-0a52e8a6018e92bb0", "HVMG2" : "NOT_SUPPORTED"},
+        "us-east-1"        : {"HVM64" : "ami-032930428bf1abbff", "HVMG2" : "ami-0aeb704d503081ea6"},
+        "us-east-2"        : {"HVM64" : "ami-027cab9a7bf0155df", "HVMG2" : "NOT_SUPPORTED"},
+        "us-west-1"        : {"HVM64" : "ami-088c153f74339f34c", "HVMG2" : "ami-0a7fc72dc0e51aa77"},
+        "us-west-2"        : {"HVM64" : "ami-01fee56b22f308154", "HVMG2" : "ami-0fe84a5b4563d8f27"}
+        }
+
+    },
+    "Resources": {                                 
+        "WebServerSecurityGroup": {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Enable http/https access via port 80/443 locked down to the load balancer",
+                "VpcId" : {"Ref" : "myVPC"},
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol" : "-1",
+                        "CidrIp" : "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupIngress" : [
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 80,
+                        "ToPort" : 80,
+                        "CidrIp" : "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 443,
+                        "ToPort" : 443,
+                        "CidrIp" : "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 22,
+                        "ToPort" : 22,
+                        "CidrIp" : { "Ref": "SSHLocation" }
+                    }
+            ]
+            }
+
+        },
+        "Ec2Instance":{
+
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": "t2.micro",
+                "SubnetId": "subnet-0ea764414a9443582",
+                "SecurityGroupIds": [ { "Ref": "WebServerSecurityGroup" }],
+                "ImageId": "ami-03a0c45ebc70f98ea",
+                "Monitoring": true,
+                "DisableApiTermination": true,
+                "KeyName": { "Ref": "KeyName"},
+                "AvailabilityZone": "us-east-2a",
+                "Tags" : [ { "Key": "name", "Value": "ec2-webserver"} ],
+                "BlockDeviceMappings" : [
+                    {
+                        "DeviceName"  : "/dev/sda1",
+                        "Ebs": { "VolumeSize": 10, "VolumeType": "gp2"}
+                    }
+                ]
+                
+            }
+        },
+        "S3Bucket": {
+            "Type": "AWS::S3::Bucket",
+            "DeletionPolicy": "Delete",
+            "Properties": {
+                "BucketName": "DOC-EXAMPLE-BUCKET"
+            },
+            "DepondsOn": [ "Ec2Instance"]
+        }
+       
+    },
+    "Outputs": {
+        "InstanceId": {
+            "Description": "Instance id of the newly created ec2 instance",
+            "Value": {
+                "Ref": "Ec2Instance"
+            }
+        },
+        "AvailabilityZone": {
+            "Description": "Availability zone of the newly created ec2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "Ec2Instance",
+                    "AvailabilityZone"
+                ]
+            }
+        },
+        "PublicDNS": {
+            "Description": "Public DNSName of the newly created ec2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "Ec2Instance",
+                    "PublicDnsName"
+                ]
+            }
+        },
+        "PublicIP": {
+            "Description": "Public IP address for the newly created ec2 instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "Ec2Instance",
+                    "PublicIp"
+                ]
+            }
+        }
+    }
+}

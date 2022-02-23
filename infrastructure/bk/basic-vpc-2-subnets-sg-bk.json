@@ -1,0 +1,196 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template deploys a VPC, with a pair of public and private subnets spread across two Availability Zones. It deploys an internet gateway, with a default route on the public subnets. It deploys one NAT gateway (one in each AZ), and default routes for them in the private subnets.",
+    "Parameters": {},
+    "Mappings": {},
+    "Resources": {
+        "myVPC": {
+            "Type" : "AWS::EC2::VPC",
+            "Properties" : {
+                "CidrBlock" : "172.31.0.0/16",
+                "EnableDnsHostnames" : true,
+                "EnableDnsSupport" : true,
+                "InstanceTenancy" : "default"
+            }
+        },  
+        "InternetGateway": {
+            "Type" : "AWS::EC2::InternetGateway",
+            "Properties" : {
+                "Tags" : [ { "Key": "name", "Value": "dev-igw"} ]
+            }
+
+        },
+        "InternetGatewayAttachment": {
+            "Type" : "AWS::EC2::VPCGatewayAttachment",
+            "Properties" : {
+                "InternetGatewayId" : { "Ref": "InternetGateway"},
+                "VpcId" : { "Ref": "myVPC"}
+              }
+        },
+        "PublicSubnet1": {
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "AvailabilityZone" : { "Fn::Select" : [ "0", { "Fn:GetAZs" : ""} ] },
+                "CidrBlock" : "172.31.16.0/20",
+                "MapPublicIpOnLaunch" : true,
+                "VpcId" : { "Ref": "myVPC"},
+                "Tags": [ { "Key": "name", "Value": "Public subnet 1 | App Tier"}]
+              }
+          },     
+        "PrivateSubnet1": {
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "AvailabilityZone" : { "Fn::Select" : [ "1", { "Fn:GetAZs" : ""} ] },
+                "CidrBlock" : "172.31.32.0/20",
+                "MapPublicIpOnLaunch" : false,
+                "VpcId" : { "Ref": "myVPC"},
+                "Tags": [ { "Key": "name", "Value": "Private subnet 1 | App or Database Tier"}]
+                }
+        },
+        "NatGateway1":{
+            "Type" : "AWS::EC2::NatGateway",
+            "Properties" : {
+                "AllocationId" : { "Fn::GetAtt" : ["EIP", "AllocationId"]},
+                "SubnetId" : { "Ref": "PublicSubnet1"}
+              }
+        },      
+        "NatGateway1EIP" : {
+            "Type" : "AWS::EC2::EIP",
+            "DependsOn" : "InternetGatewayAttachment",
+            "Properties" : {
+               "Domain" : "vpc"
+            }
+        },
+        "PublicRouteTable": {
+            "Type" : "AWS::EC2::RouteTable",
+            "Properties" : {
+                "Tags" : [ { "Key" : "name", "Value" : "Public route table"} ],
+                "VpcId" : { "Ref": "myVPC" }
+            }
+
+        } ,
+        "PrivateRouteTable": {
+            "Type" : "AWS::EC2::RouteTable",
+            "Properties" : {
+                "Tags" : [ { "Key" : "name", "Value" : "Private route table"} ],
+                "VpcId" : { "Ref": "myVPC" }
+            }
+
+        } ,
+        "PublicRoute": {
+            "Type" : "AWS::EC2::Route",
+            "DependsOn" : "InternetGatewayAttachment",
+            "Properties" : {
+                "DestinationCidrBlock" : "0.0.0.0/0",
+                "GatewayId" : { "Ref": "InternetGateway" },
+                "RouteTableId" : { "Ref": "PublicRouteTable" } 
+              }
+        }, 
+        "PrivateRoute": {
+            "Type" : "AWS::EC2::Route",
+            "Properties" : {
+                "DestinationCidrBlock" : "0.0.0.0/0",
+                "NatGatewayId" : { "Ref": "NatGateway1" },
+                "RouteTableId" : { "Ref": "PrivateRouteTable" } 
+              }
+        }, 
+        "PublicSubnet1RouteTableAssociation": {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+                "RouteTableId" :  { "Ref": "PublicRouteTable" },
+                "SubnetId" : { "Ref": "PublicSubnet1" }
+              }
+        },    
+        "PrivateSubnet1RouteTableAssociation": {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+                "RouteTableId" :  { "Ref": "PrivateRouteTable" },
+                "SubnetId" : { "Ref": "PrivateSubnet1" }
+              }
+        },                             
+        "WebServerSecurityGroup": {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Enable http/https access via port 80/443 locked down to the load balancer",
+                "VpcId" : {"Ref" : "myVPC"},
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol" : "-1",
+                        "CidrIp" : "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupIngress" : [
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 80,
+                        "ToPort" : 80,
+                        "CidrIp" : "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 443,
+                        "ToPort" : 443,
+                        "CidrIp" : "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 22,
+                        "ToPort" : 22,
+                        "CidrIp" : "0.0.0.0/0"
+                    }
+            ]
+            }
+
+        }
+       
+    },
+    "Outputs": {
+
+        "Vpc": {
+            "Description" : "A list of the private subnets",
+            "Value": {
+                "Ref": "myVPC"
+            }
+        },
+        "PublicSubnet1": {
+            "Description" : "A reference to the public subnet in the 1st Availability Zone",
+            "Value": {
+               "Ref": "PublicSubnet1"
+            }
+
+        },
+        "PrivateSubnet1": {
+            "Description" : "A reference to the private subnet in the 1st Availability Zone",
+            "Value": {
+                "Ref": "PrivateSubnet1"
+             } 
+
+        },
+        "PublicSubnets": {
+            "Description" : "A list of the public subnets",
+            "Value": {
+                "Fn::Join": [
+                  ",", [
+                    {
+                        "Ref": "PublicSubnet1" 
+                    }
+                  ]
+                ]
+            }
+
+        },
+        "PrivateSubnets": {
+            "Description" : "A list of the private subnets",
+            "Value": {
+                "Fn::Join": [
+                  ",", [
+                    {
+                        "Ref": "PrivateSubnet1" 
+                    }
+                  ]
+                ]
+            }
+
+        }
+    }
+}

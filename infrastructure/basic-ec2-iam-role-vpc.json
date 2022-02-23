@@ -1,0 +1,68 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template deploys an ec2 instance into a known vpc ,subnet group with a defined security group",
+    "Parameters": {},
+    "Mappings": {},
+    "Resources": {
+                             
+        "WebServerSecurityGroup": {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Enable http/https access via port 80, 443 and 22",
+                "VpcId" : "vpc-0c7dcbf6b6959de47",
+                "Tags" : [ { "Key": "name", "Value": "webserver-example"} ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol" : "-1",
+                        "CidrIp" : "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupIngress" : [
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 80,
+                        "ToPort" : 80,
+                        "CidrIp" : "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 443,
+                        "ToPort" : 443,
+                        "CidrIp" : "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 22,
+                        "ToPort" : 22,
+                        "CidrIp" : "0.0.0.0/0"
+                    }
+            ]
+            }
+
+        },
+        "ec2WebServer":{
+
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": "t2.micro",
+                "SubnetId": "subnet-0ea764414a9443582",
+                "SecurityGroupIds": [ { "Ref": "WebServerSecurityGroup" }],
+                "ImageId": "ami-03a0c45ebc70f98ea",
+                "Monitoring": true,
+                "DisableApiTermination": true,
+                "KeyName":"prometheus_key",
+                "AvailabilityZone": "us-east-2a",
+                "Tags" : [ { "Key": "name", "Value": "ec2-webserver"} ],
+                "BlockDeviceMappings" : [
+                    {
+                       "DeviceName"  : "/dev/sda1",
+                       "Ebs": { "VolumeSize": 10, "VolumeType": "gp2"}
+                    }
+                 ]
+                
+            }
+        }
+       
+    },
+    "Outputs": {}
+}
