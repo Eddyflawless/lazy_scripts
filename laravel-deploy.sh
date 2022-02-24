@@ -1,6 +1,13 @@
 #! /bin/bash
 source constants.sh
+php_libraries=("php" "libapache2-mod-php" "php-mysql" "php-curl" "php-gd" "php-json" "php-zip" "php-mbstring" " php-gettext" "apache2" )
+
 echo "running $0 "
+
+# $# number of passed arguments
+# $@ all positional arguments
+# $? returns exit code [ 0 = success 1 = failed]
+# $$ script's PID
 
 # Login as root user
 # sudo su -
@@ -110,12 +117,13 @@ install_composer(){
 
 }
 
-install_dependences(){
+install_php_apache_dependences(){
     apt-get update
-    apt-get install apache2 -y
+    echo "--------------------------------"
+    echo "Installing Apache and php dependencies...."
+    echo "--------------------------------"
+    apt-get install ${php_libraries[@]}
     apache2ctl configtest
-    apt-get install php libapache2-mod-php php-mysql php-curl php-gd php-json php-zip php-mbstring php-gettext -y
-    apt-get install mysql-server -y
     phpenmod mcrypt
     phpenmod mbstring
 
@@ -124,6 +132,19 @@ install_dependences(){
 install_mysql_server(){
     # Install MySQL
     apt install mysql-server
+}
+
+install_cert_bot(){
+    sudo apt install certbot python3-certbot-nginx
+}
+
+install_library(){
+
+    for ((i=1; i<=$#; i++))
+    do
+        apt install $i -y
+    done
+
 }
 
 comfigure_mysql(){
@@ -137,6 +158,36 @@ EOF
 
 }
 
+install_supervisor(){
+
+    laravel_conf=$1
+
+    apt install supervisor -y
+    nano /etc/supervisor/conf.d/$laravel_conf.conf
+    supervisorctl reread
+    supervisorctl update
+    supervisorctl start $laravel_conf:*
+
+}
+
+add_known_hosts(){
+    ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+    ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
+    ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
+}
+
+# In order for this maschine to gain read-only access to your repositories you need to copy this key to
+# - Bitbucket: under Project -> Settings -> Access keys
+
+set_up_ssh_key(){
+
+    if [ ! -f ~/.ssh/id_rsa.pub ]; then
+        ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
+    fi
+
+    cat ~/.ssh/id_rsa.pub
+
+}
 
 laravel_cleanup_optimization_str(){
 
@@ -178,7 +229,7 @@ printLine
 
 # fi
 
-createEnv
+#createEnv
 
 #loadEnv 
 
