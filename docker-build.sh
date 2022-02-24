@@ -1,23 +1,46 @@
-#!/bin/bash
+#!/bin/sh
 
-run_build(){
+declare -a dockerFiles
+prefix="zeta_microservices"
+services=("client-service" "notification-service" )
+service_ports=("82:3000" "81:30001")
+ecr_repository=119568105319.dkr.ecr.eu-west-2.amazonaws.com
+region="eu-west-2"
 
-    docker build -t zeta-microservices_client-service  ./client-service
-    docker build -t zeta-microservices_notification-service ./notification-service
-
+remove_dangling_images(){
+    docker images -f "dangling=true" -q
 }
-
 
 serve_application_detached(){
 
-    docker run -d -p 82:3000 zeta-microservices_client-service
-    docker run -d -p 3001:3001 zeta-microservices_notification-service
+    count=0
+    for svc  in "${services[@]}"; do
+
+        svc_port=${service_ports[$count]}
+        _container=$(construct_container_name $svc)
+        docker run -d -p 82:3000 $_container
+
+    done
+    
 }
 
 stop_all(){
 
-    docker stop $(docker ps | grep "zeta-microservices_client-service" | awk '{ print $1}')
-    docker stop $(docker ps | grep "zeta-microservices_notification-service" | awk '{ print $1}')
+    for svc  in "${services[@]}"; do
+
+        _container=$(construct_container_name $svc)
+        docker stop $(docker ps | grep "$_container" | awk '{ print $1}')
+
+    done
+
+    clean_up
+}
+
+construct_container_name(){
+
+    service_name=$1
+    echo $prefix"_"$svc
+
 }
 
 stop_rebuild(){
@@ -28,7 +51,6 @@ stop_rebuild(){
 
 push_images_to_ecr(){
 
-    ecr_repository=119568105319.dkr.ecr.eu-west-2.amazonaws.com
     image_to_push=$1
 
     if [ $# -lt 1 ]; then
@@ -59,28 +81,66 @@ push_images_to_ecr(){
     
 }
 
+push_images(){
+
+    #tag image
+    push_images_to_ecr $1
+
+}
+
+clean_up(){
+    unset dockerFiles
+    unset prefix
+    unset services
+}
 
 
+#${sounds[@]} returns all values
+#${!sounds[@]} returns all keys
+
+run_multi(){
+
+    for svc  in "${services[@]}"; do
+        _container=$(construct_container_name $svc)
+        run_single_build $_container $svc
+    done
+
+}
+
+run_single(){
+    docker run -d -p 82:3000 $1 $2
+}
+
+build_multi(){
+
+    for svc  in "${services[@]}"; do
+        _container=$(construct_container_name $svc)
+        dir="$svc/."
+        build_single $_container $dir
+
+    done
+
+}
+
+build_single(){
+
+    container_name=$1
+    dir=$2
+    docker build -t $container_name $dir
+
+}
 
 
-# zeta-microservices_notification-service
+#function definitions
+usage(){
+    echo ""
+    echo  "Helper bible" 
+    echo  ""
+    exit 0
+}
 
-docker build -t zeta-microservices_client-service .
+if [[ "$#" -eq 0  ]]; then
 
-docker build -t zeta-microservices_notification-service  .
+    usage 
 
-
-docker tag zeta-microservices_client-service:latest 119568105319.dkr.ecr.eu-west-2.amazonaws.com/v1-client-api:latest
-
-
-
-docker build -t zeta-microservices_notification-service  .
-
-docker tag zeta-microservices_notification-service  119568105319.dkr.ecr.eu-west-2.amazonaws.com/v1-notification-api:latest
-
-docker push 119568105319.dkr.ecr.eu-west-2.amazonaws.com/v1-notification-api:latest
-
-# docker tag zeta-microservices_notification-service:latest 119568105319.dkr.ecr.eu-west-2.amazonaws.com/v1-notification-api:latest
-
-
- docker images -f "dangling=true" -q
+fi
